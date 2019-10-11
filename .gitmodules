@@ -77,9 +77,6 @@
 [submodule "tools/treadle"]
 	path = tools/treadle
 	url = https://github.com/freechipsproject/treadle.git
-[submodule "generators/sha3"]
-	path = generators/sha3
-	url = https://github.com/ucb-bar/sha3.git
 [submodule "tools/firrtl-interpreter"]
 	path = tools/firrtl-interpreter
 	url = https://github.com/freechipsproject/firrtl-interpreter.git

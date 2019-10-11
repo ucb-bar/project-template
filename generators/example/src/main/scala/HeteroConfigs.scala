@@ -18,14 +18,12 @@ class LargeBoomAndRocketConfig extends Config(
   new freechips.rocketchip.subsystem.WithNBigCores(1) ++   // single-core rocket
   new freechips.rocketchip.system.BaseConfig)              // "base" rocketchip system
 
-class SmallBoomAndRocketConfig extends Config(
+class TutorialSmallBoomConfig extends Config(
   new WithTop ++
   new WithBootROM ++
   new freechips.rocketchip.subsystem.WithInclusiveCache ++
-  new boom.common.WithRenumberHarts ++
   new boom.common.WithSmallBooms ++                        // 1-wide boom
   new boom.common.WithNBoomCores(1) ++
-  new freechips.rocketchip.subsystem.WithNBigCores(1) ++
   new freechips.rocketchip.system.BaseConfig)
 
 // DOC include start: BoomAndRocketWithHwacha

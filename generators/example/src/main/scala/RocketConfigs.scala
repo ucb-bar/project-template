@@ -15,6 +15,13 @@ class RocketConfig extends Config(
   new freechips.rocketchip.subsystem.WithNBigCores(1) ++   // single rocket-core
   new freechips.rocketchip.system.BaseConfig)              // "base" rocketchip system
 
+class TutorialRocketConfig extends Config(
+  new WithTop ++                                           // use default top
+  new WithBootROM ++                                       // use default bootrom
+  new freechips.rocketchip.subsystem.WithInclusiveCache ++ // use Sifive L2 cache
+  new freechips.rocketchip.subsystem.WithNBigCores(1) ++   // single rocket-core
+  new freechips.rocketchip.system.BaseConfig)              // "base" rocketchip system
+
 class HwachaRocketConfig extends Config(
   new WithTop ++
   new WithBootROM ++
@@ -123,13 +130,6 @@ class GB1MemoryRocketConfig extends Config(
   new freechips.rocketchip.system.BaseConfig)
 
 // DOC include start: Sha3Rocket
-class Sha3RocketConfig extends Config(
-  new WithTop ++
-  new WithBootROM ++
-  new freechips.rocketchip.subsystem.WithInclusiveCache ++
-  new sha3.WithSha3Accel ++                                // add SHA3 rocc accelerator
-  new freechips.rocketchip.subsystem.WithNBigCores(1) ++
-  new freechips.rocketchip.system.BaseConfig)
 // DOC include end: Sha3Rocket
 
 // DOC include start: InitZeroRocketConfig
