@@ -11,6 +11,7 @@ case class GenerateSimConfig(
 sealed trait Simulator
 object VerilatorSimulator extends Simulator
 object VCSSimulator extends Simulator
+object ArtySimulator extends Simulator
 
 trait HasGenerateSimConfig {
   val parser = new scopt.OptionParser[GenerateSimConfig]("GenerateSimFiles") {
@@ -22,6 +23,7 @@ trait HasGenerateSimConfig {
       .action((x, c) => x match {
         case "verilator" => c.copy(simulator = Some(VerilatorSimulator))
         case "vcs" => c.copy(simulator = Some(VCSSimulator))
+        case "arty" => c.copy(simulator = Some(ArtySimulator))
         case "none" => c.copy(simulator = None)
         case _ => throw new Exception(s"Unrecognized simulator $x")
       })
@@ -51,6 +53,7 @@ object GenerateSimFiles extends App with HasGenerateSimConfig {
         case Some(VerilatorSimulator) => s"-FI ${fname}"
         // vcs pulls headers in with +incdir, doesn't have anything like verilator.h
         case Some(VCSSimulator) => ""
+        case Some(ArtySimulator) => ""
         case None => ""
       }
     } else { // do nothing otherwise
@@ -118,6 +121,9 @@ object GenerateSimFiles extends App with HasGenerateSimConfig {
       )
       case Some(VCSSimulator) => Seq(
         "/vsrc/TestDriver.v",
+      )
+      case Some(ArtySimulator) => Seq(
+        "/vsrc/ArtyTestDriver.v",
       )
       case None => Seq()
     })

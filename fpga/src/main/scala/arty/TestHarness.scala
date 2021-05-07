@@ -11,6 +11,8 @@ import chipyard.{BuildTop, HasHarnessSignalReferences, HasTestHarnessFunctions}
 import chipyard.harness.{ApplyHarnessBinders}
 import chipyard.iobinders.{HasIOBinders}
 
+import testchipip.{SerialTLKey}
+
 class ArtyFPGATestHarness(override implicit val p: Parameters) extends ArtyShell with HasHarnessSignalReferences {
 
   val lazyDut = LazyModule(p(BuildTop)(p)).suggestName("chiptop")
@@ -29,8 +31,7 @@ class ArtyFPGATestHarness(override implicit val p: Parameters) extends ArtyShell
 
   val harnessClock = clock_32MHz
   val harnessReset = hReset
-  val success = false.B
-
+  val success = if (p(SerialTLKey).isEmpty) false.B else IO(Output(Bool()))
   val dutReset = dReset
 
   // must be after HasHarnessSignalReferences assignments
