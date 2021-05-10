@@ -15,6 +15,7 @@ import freechips.rocketchip.rocket.{RocketCoreParams, MulDivParams, DCacheParams
 import freechips.rocketchip.tilelink.{HasTLBusParams}
 import freechips.rocketchip.util.{AsyncResetReg, Symmetric}
 import freechips.rocketchip.prci._
+import freechips.rocketchip.stage.phases.TargetDirKey
 
 import testchipip._
 import tracegen.{TraceGenSystem}
@@ -36,7 +37,7 @@ import chipyard._
 // -----------------------
 
 class WithBootROM extends Config((site, here, up) => {
-  case BootROMLocated(x) => up(BootROMLocated(x), site).map(_.copy(contentFileName = s"./bootrom/bootrom.rv${site(XLen)}.img"))
+  case BootROMLocated(x) => up(BootROMLocated(x), site).map(_.copy(contentFileName = s"${site(TargetDirKey)}/bootrom.rv${site(XLen)}.img"))
 })
 
 // DOC include start: gpio config fragment

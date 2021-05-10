@@ -122,15 +122,15 @@ object GenerateSimFiles extends App with HasGenerateSimConfig {
       case None => Seq()
     })
 
-  def writeBootrom(): Unit = {
-    firrtl.FileUtils.makeDirectory("./bootrom/")
-    writeResource("/testchipip/bootrom/bootrom.rv64.img", "./bootrom/")
-    writeResource("/testchipip/bootrom/bootrom.rv32.img", "./bootrom/")
-    writeResource("/bootrom/bootrom.img", "./bootrom/")
+  def writeBootrom(cfg: GenerateSimConfig): Unit = {
+    firrtl.FileUtils.makeDirectory(cfg.targetDir)
+    writeResource("/testchipip/bootrom/bootrom.rv64.img", cfg.targetDir)
+    writeResource("/testchipip/bootrom/bootrom.rv32.img", cfg.targetDir)
+    writeResource("/bootrom/bootrom.img", cfg.targetDir)
   }
 
   def writeFiles(cfg: GenerateSimConfig): Unit = {
-    writeBootrom()
+    writeBootrom(cfg)
     firrtl.FileUtils.makeDirectory(cfg.targetDir)
     val files = resources(cfg.simulator).map { writeResource(_, cfg.targetDir) }
     writeDotF(files.map(addOption(_, cfg)), cfg)

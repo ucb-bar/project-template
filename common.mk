@@ -6,7 +6,7 @@ SHELL=/bin/bash
 ifndef RISCV
 $(error RISCV is unset. You must set RISCV yourself, or through the Chipyard auto-generated env file)
 else
-$(info Running with RISCV=$(RISCV))
+$(info #Running with RISCV=$(RISCV))
 endif
 
 #########################################################################################
@@ -60,7 +60,7 @@ include $(base_dir)/tools/dromajo/dromajo.mk
 #########################################################################################
 # Returns a list of files in directory $1 with file extension $2.
 # If available, use 'fd' to find the list of files, which is faster than 'find'.
-ifeq ($(shell which fd),)
+ifeq ($(shell which fd 2>/dev/null),)
 	lookup_srcs = $(shell find -L $(1)/ -name target -prune -o -iname "*.$(2)" -print 2> /dev/null)
 else
 	lookup_srcs = $(shell fd -L ".*\.$(2)" $(1))

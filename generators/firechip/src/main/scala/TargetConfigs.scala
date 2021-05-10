@@ -4,6 +4,7 @@ import java.io.File
 
 import chisel3._
 import chisel3.util.{log2Up}
+import chipyard.config.WithBootROM
 import freechips.rocketchip.config.{Parameters, Config}
 import freechips.rocketchip.groundtest.TraceGenParams
 import freechips.rocketchip.tile._
@@ -23,19 +24,6 @@ import testchipip.WithRingSystemBus
 import firesim.bridges._
 import firesim.configs._
 
-class WithBootROM extends Config((site, here, up) => {
-  case BootROMLocated(x) => {
-    val chipyardBootROM = new File(s"./generators/testchipip/bootrom/bootrom.rv${site(XLen)}.img")
-    val firesimBootROM = new File(s"./target-rtl/chipyard/generators/testchipip/bootrom/bootrom.rv${site(XLen)}.img")
-
-    val bootROMPath = if (chipyardBootROM.exists()) {
-      chipyardBootROM.getAbsolutePath()
-    } else {
-      firesimBootROM.getAbsolutePath()
-    }
-    up(BootROMLocated(x), site).map(_.copy(contentFileName = bootROMPath))
-  }
-})
 
 // Disables clock-gating; doesn't play nice with our FAME-1 pass
 class WithoutClockGating extends Config((site, here, up) => {
@@ -65,8 +53,6 @@ class WithFireSimDesignTweaks extends Config(
   new WithDefaultMemModel ++
   // Required*: Uses FireSim ClockBridge and PeekPokeBridge to drive the system with a single clock/reset
   new WithFireSimSimpleClocks ++
-  // Required*: When using FireSim-as-top to provide a correct path to the target bootrom source
-  new WithBootROM ++
   // Required: Existing FAME-1 transform cannot handle black-box clock gates
   new WithoutClockGating ++
   // Required*: Removes thousands of assertions that would be synthesized (* pending PriorityMux bugfix)
