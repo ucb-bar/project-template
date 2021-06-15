@@ -154,6 +154,17 @@ jobs:
                     sudo pip3 install -r docs/requirements.txt
                     make -C docs html
 
+    check-precompiled-toolchain:
+        executor: main-env
+        description: "Run through the precompiled toolchain build to ensure it is up to date."
+        steps:
+            - checkout
+            - run:
+                name: Building precompiled toolchain
+                command: |
+                    .circleci/build-toolchains.sh ec2fast
+                no_output_timeout: 120m
+
     install-riscv-toolchain:
         executor: main-env
         steps:
@@ -411,6 +422,9 @@ workflows:
 
             # Check that documentation builds
             - documentation-check
+
+            # Check that the precompiled toolchain can install correctly
+            - check-precompiled-toolchain
 
             # Build extra tests
             - build-extra-tests:
