@@ -31,6 +31,7 @@ import sifive.blocks.devices.uart._
 import sifive.blocks.devices.spi._
 
 import chipyard._
+import chipyard.clocking._
 
 // -----------------------
 // Common Config Fragments
@@ -68,8 +69,10 @@ class WithL2TLBs(entries: Int) extends Config((site, here, up) => {
   }
 })
 
+class TraceGenTop(implicit p: Parameters) extends TraceGenSystem
+  with HasChipyardPRCI
 class WithTracegenSystem extends Config((site, here, up) => {
-  case BuildSystem => (p: Parameters) => new TraceGenSystem()(p)
+  case BuildSystem => (p: Parameters) => new TraceGenTop()(p)
 })
 
 /**

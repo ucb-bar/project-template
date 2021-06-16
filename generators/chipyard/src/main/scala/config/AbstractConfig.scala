@@ -22,6 +22,7 @@ class AbstractConfig extends Config(
   new chipyard.harness.WithTieOffInterrupts ++                  // tie-off interrupt ports, if present
   new chipyard.harness.WithTieOffL2FBusAXI ++                   // tie-off external AXI4 master, if present
   new chipyard.harness.WithTieOffCustomBootPin ++
+  new chipyard.harness.WithClockAndResetFromHarness ++
 
   // The IOBinders instantiate ChipTop IOs to match desired digital IOs
   // IOCells are generated for "Chip-like" IOs, while simulation-only IOs are directly punched through
@@ -39,6 +40,7 @@ class AbstractConfig extends Config(
   new chipyard.iobinders.WithTraceIOPunchthrough ++
   new chipyard.iobinders.WithExtInterruptIOCells ++
   new chipyard.iobinders.WithCustomBootPin ++
+  new chipyard.iobinders.WithDividerOnlyClockGenerator ++
 
   new testchipip.WithDefaultSerialTL ++                          // use serialized tilelink port to external serialadapter/harnessRAM
   new chipyard.config.WithBootROM ++                             // use default bootrom

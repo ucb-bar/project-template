@@ -11,7 +11,7 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.system.{SimAXIMem}
 import freechips.rocketchip.amba.axi4.{AXI4Bundle, AXI4SlaveNode, AXI4MasterNode, AXI4EdgeParameters}
 import freechips.rocketchip.util._
-import freechips.rocketchip.prci.{ClockSinkNode, ClockSinkParameters}
+import freechips.rocketchip.prci._
 import freechips.rocketchip.groundtest.{GroundTestSubsystemModuleImp, GroundTestSubsystem}
 
 import sifive.blocks.devices.gpio._
@@ -23,6 +23,7 @@ import barstools.iocell.chisel._
 
 import testchipip._
 import icenet.{CanHavePeripheryIceNIC, SimNetwork, NicLoopback, NICKey, NICIOvonly}
+import chipyard.clocking.{HasChipyardPRCI, DividerOnlyClockGenerator}
 
 import scala.reflect.{ClassTag}
 
@@ -384,3 +385,43 @@ class WithDontTouchPorts extends OverrideIOBinder({
   (system: DontTouch) => system.dontTouchPorts(); (Nil, Nil)
 })
 
+class ClockWithFreq(val freqMHz: Double) extends Bundle {
+  val clock = Clock()
+}
+
+class WithDividerOnlyClockGenerator extends OverrideLazyIOBinder({
+  (system: HasChipyardPRCI) => {
+    // First connect the implicit clock
+    implicit val p = GetSystemParameters(system)
+    val implicitClockSinkNode = ClockSinkNode(Seq(ClockSinkParameters(name = Some("implicit_clock"))))
+    system.connectImplicitClockSinkNode(implicitClockSinkNode)
+    InModuleBody {
+      val implicit_clock = implicitClockSinkNode.in.head._1.clock
+      val implicit_reset = implicitClockSinkNode.in.head._1.reset
+      system.asInstanceOf[BaseSubsystem].module match { case l: LazyModuleImp => {
+        l.clock := implicit_clock
+        l.reset := implicit_reset
+      }}
+    }
+
+    val referenceClockSource = ClockSourceNode(Seq(ClockSourceParameters()))
+    val dividerOnlyClockGen = LazyModule(new DividerOnlyClockGenerator("buildTopClockGenerator"))
+
+    (system.allClockGroupsNode
+      := dividerOnlyClockGen.node
+      := referenceClockSource)
+    InModuleBody {
+      val clock_wire = Wire(Input(new ClockWithFreq(dividerOnlyClockGen.module.referenceFreq)))
+      val reset_wire = Wire(Input(AsyncReset()))
+      val (clock_io, clockIOCell) = IOCell.generateIOFromSignal(clock_wire, "clock", p(IOCellKey))
+      val (reset_io, resetIOCell) = IOCell.generateIOFromSignal(reset_wire, "reset", p(IOCellKey))
+
+      referenceClockSource.out.unzip._1.map { o =>
+        o.clock := clock_wire.clock
+        o.reset := reset_wire
+      }
+
+      (Seq(clock_io, reset_io), clockIOCell ++ resetIOCell)
+    }
+  }
+})

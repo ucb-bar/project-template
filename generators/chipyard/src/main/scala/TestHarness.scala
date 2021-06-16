@@ -17,13 +17,14 @@ import chipyard.clocking.{SimplePllConfiguration, ClockDividerN}
 // -------------------------------
 
 case object BuildTop extends Field[Parameters => LazyModule]((p: Parameters) => new ChipTop()(p))
-
-trait HasTestHarnessFunctions {
-  val harnessFunctions = ArrayBuffer.empty[HasHarnessSignalReferences => Seq[Any]]
-}
+case object DefaultClockFrequencyKey extends Field[Double](100.0)
 
 trait HasHarnessSignalReferences {
+  implicit val p: Parameters
   // clock/reset of the chiptop reference clock (can be different than the implicit harness clock/reset)
+  var refClockFreq: Double = p(DefaultClockFrequencyKey)
+  def setRefClockFreq(freqMHz: Double) = { refClockFreq = freqMHz }
+  def getRefClockFreq: Double = refClockFreq
   def buildtopClock: Clock
   def buildtopReset: Reset
   def dutReset: Reset
@@ -90,24 +91,18 @@ class TestHarness(implicit val p: Parameters) extends Module with HasHarnessSign
 
   io.success := false.B
 
-  val freqMHz = lazyDut match {
-    case d: HasReferenceClockFreq => d.refClockFreqMHz
-    case _ => p(DefaultClockFrequencyKey)
-  }
-  val refClkBundle = p(HarnessClockInstantiatorKey).requestClockBundle("buildtop_reference_clock", freqMHz * (1000 * 1000))
-
-  buildtopClock := refClkBundle.clock
-  buildtopReset := WireInit(refClkBundle.reset)
-  val dutReset = refClkBundle.reset.asAsyncReset
-
+  val dutReset = buildtopReset.asAsyncReset
   val success = io.success
 
-  lazyDut match { case d: HasTestHarnessFunctions =>
-    d.harnessFunctions.foreach(_(this))
-  }
   lazyDut match { case d: HasIOBinders =>
     ApplyHarnessBinders(this, d.lazySystem, d.portMap)
   }
+
+  val refClkBundle = p(HarnessClockInstantiatorKey).requestClockBundle("buildtop_reference_clock", getRefClockFreq * (1000 * 1000))
+
+  buildtopClock := refClkBundle.clock
+  buildtopReset := WireInit(refClkBundle.reset)
+
 
   val implicitHarnessClockBundle = Wire(new ClockBundle(ClockBundleParameters()))
   implicitHarnessClockBundle.clock := clock

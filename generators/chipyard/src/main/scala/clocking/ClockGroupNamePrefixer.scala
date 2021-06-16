@@ -2,9 +2,22 @@ package chipyard.clocking
 
 import chisel3._
 
-import freechips.rocketchip.config.{Parameters}
+import freechips.rocketchip.config.{Parameters, Config, Field}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.prci._
+
+case object ClockFrequencyAssignersKey extends Field[Seq[(String) => Option[Double]]](Seq.empty)
+
+class ClockNameMatchesAssignment(name: String, fMHz: Double) extends Config((site, here, up) => {
+  case ClockFrequencyAssignersKey => up(ClockFrequencyAssignersKey, site) ++
+    Seq((cName: String) => if (cName == name) Some(fMHz) else None)
+})
+
+class ClockNameContainsAssignment(name: String, fMHz: Double) extends Config((site, here, up) => {
+  case ClockFrequencyAssignersKey => up(ClockFrequencyAssignersKey, site) ++
+    Seq((cName: String) => if (cName.contains(name)) Some(fMHz) else None)
+})
+
 
 /**
   * This sort of node can be used when it is a connectivity passthrough, but modifies

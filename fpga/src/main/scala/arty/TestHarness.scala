@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Parameters}
 
 import sifive.fpgashells.shell.xilinx.artyshell.{ArtyShell}
 
-import chipyard.{BuildTop, HasHarnessSignalReferences, HasTestHarnessFunctions}
+import chipyard.{BuildTop, HasHarnessSignalReferences}
 import chipyard.harness.{ApplyHarnessBinders}
 import chipyard.iobinders.{HasIOBinders}
 
@@ -34,9 +34,6 @@ class ArtyFPGATestHarness(override implicit val p: Parameters) extends ArtyShell
   val dutReset = dReset
 
   // must be after HasHarnessSignalReferences assignments
-  lazyDut match { case d: HasTestHarnessFunctions =>
-    d.harnessFunctions.foreach(_(this))
-  }
   lazyDut match { case d: HasIOBinders =>
     ApplyHarnessBinders(this, d.lazySystem, d.portMap)
   }

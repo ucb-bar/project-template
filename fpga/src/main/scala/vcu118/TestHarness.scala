@@ -17,7 +17,7 @@ import sifive.blocks.devices.uart._
 import sifive.blocks.devices.spi._
 import sifive.blocks.devices.gpio._
 
-import chipyard.{HasHarnessSignalReferences, HasTestHarnessFunctions, BuildTop, ChipTop, ExtTLMem, CanHaveMasterTLMemPort, DefaultClockFrequencyKey, HasReferenceClockFreq}
+import chipyard.{HasHarnessSignalReferences, BuildTop, ChipTop, ExtTLMem, CanHaveMasterTLMemPort, DefaultClockFrequencyKey}
 import chipyard.iobinders.{HasIOBinders}
 import chipyard.harness.{ApplyHarnessBinders}
 
@@ -129,17 +129,11 @@ class VCU118FPGATestHarnessImp(_outer: VCU118FPGATestHarness) extends LazyRawMod
   childReset := buildtopReset
 
   // harness binders are non-lazy
-  _outer.topDesign match { case d: HasTestHarnessFunctions =>
-    d.harnessFunctions.foreach(_(this))
-  }
   _outer.topDesign match { case d: HasIOBinders =>
     ApplyHarnessBinders(this, d.lazySystem, d.portMap)
   }
 
   // check the top-level reference clock is equal to the default
   // non-exhaustive since you need all ChipTop clocks to equal the default
-  _outer.topDesign match {
-    case d: HasReferenceClockFreq => require(d.refClockFreqMHz == p(DefaultClockFrequencyKey))
-    case _ =>
-  }
+  require(getRefClockFreq == p(DefaultClockFrequencyKey))
 }

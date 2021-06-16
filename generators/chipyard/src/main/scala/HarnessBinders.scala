@@ -22,7 +22,8 @@ import barstools.iocell.chisel._
 import testchipip._
 
 import chipyard.{HasHarnessSignalReferences, HarnessClockInstantiatorKey}
-import chipyard.iobinders.{GetSystemParameters, JTAGChipIO}
+import chipyard.clocking.{HasChipyardPRCI}
+import chipyard.iobinders.{GetSystemParameters, JTAGChipIO, ClockWithFreq}
 
 import tracegen.{TraceGenSystemModuleImp}
 import icenet.{CanHavePeripheryIceNIC, SimNetwork, NicLoopback, NICKey, NICIOvonly}
@@ -324,6 +325,21 @@ class WithSimDromajoBridge extends ComposeHarnessBinder({
 
 class WithTieOffCustomBootPin extends OverrideHarnessBinder({
   (system: CanHavePeripheryCustomBootPin, th: HasHarnessSignalReferences, ports: Seq[Bool]) => {
-    ports.foreach(_ := false.B)
+    val pin = PlusArg("custom_boot_pin", width=1)
+    ports.foreach(_ := pin)
+  }
+})
+
+
+class WithClockAndResetFromHarness extends OverrideHarnessBinder({
+  (system: HasChipyardPRCI, th: HasHarnessSignalReferences, ports: Seq[Data]) => {
+    implicit val p = GetSystemParameters(system)
+    ports.map ({
+      case c: ClockWithFreq => {
+        th.setRefClockFreq(c.freqMHz)
+        c.clock := th.buildtopClock
+      }
+      case r: AsyncReset => r := th.buildtopReset.asAsyncReset
+    })
   }
 })

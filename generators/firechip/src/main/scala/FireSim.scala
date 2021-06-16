@@ -10,7 +10,7 @@ import chisel3.experimental.{IO}
 import freechips.rocketchip.prci._
 import freechips.rocketchip.subsystem.{BaseSubsystem, SubsystemDriveAsyncClockGroupsKey}
 import freechips.rocketchip.config.{Field, Config, Parameters}
-import freechips.rocketchip.diplomacy.{LazyModule, InModuleBody, ValName}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, InModuleBody, ValName}
 import freechips.rocketchip.util.{ResetCatchAndSync, RecordMap}
 
 import midas.widgets.{Bridge, PeekPokeBridge, RationalClockBridge, RationalClock}
@@ -166,59 +166,71 @@ class ClockBridgeInstantiator {
 case object ClockBridgeInstantiatorKey extends Field[ClockBridgeInstantiator](new ClockBridgeInstantiator)
 case object FireSimBaseClockNameKey extends Field[String]("implicit_clock")
 
-class WithFireSimSimpleClocks extends Config((site, here, up) => {
-  case ClockingSchemeKey => { chiptop: ChipTop =>
-    implicit val p = chiptop.p
+class ClocksWithSinkParams(val params: Seq[ClockSinkParameters]) extends Bundle {
+  val clocks = Vec(params.size, Clock())
+}
+
+class WithFireSimSimpleClocks extends OverrideLazyIOBinder({
+  (system: HasChipyardPRCI) => {
+    implicit val p = GetSystemParameters(system)
     // Figure out what provides this in the chipyard scheme
     implicit val valName = ValName("FireSimClocking")
 
-    // Requires existence of undriven asyncClockGroups in subsystem
-    val systemAsyncClockGroup = chiptop.lazySystem match {
-      case l: BaseSubsystem if (p(SubsystemDriveAsyncClockGroupsKey).isEmpty) =>
-        l.asyncClockGroupsNode
+    val implicitClockSinkNode = ClockSinkNode(Seq(ClockSinkParameters(name = Some("implicit_clock"))))
+    system.connectImplicitClockSinkNode(implicitClockSinkNode)
+    InModuleBody {
+      val implicit_clock = implicitClockSinkNode.in.head._1.clock
+      val implicit_reset = implicitClockSinkNode.in.head._1.reset
+      system.asInstanceOf[BaseSubsystem].module match { case l: LazyModuleImp => {
+        l.clock := implicit_clock
+        l.reset := implicit_reset
+      }}
     }
 
-    val aggregator = LazyModule(new ClockGroupAggregator("allClocks")).node
-    (chiptop.implicitClockSinkNode := ClockGroup() := aggregator)
-    (systemAsyncClockGroup :*= ClockGroupNamePrefixer() :*= aggregator)
-
     val inputClockSource = ClockGroupSourceNode(Seq(ClockGroupSourceParameters()))
-
-    (aggregator
-      := ClockGroupResetSynchronizer()
-      := ClockGroupFrequencySpecifier(p(ClockFrequencyAssignersKey), p(DefaultClockFrequencyKey))
-      := inputClockSource)
-
+    system.allClockGroupsNode := inputClockSource
 
     InModuleBody {
       val (clockGroupBundle, clockGroupEdge) = inputClockSource.out.head
-      val input_clocks = IO(Input(RecordMap((clockGroupEdge.sink.members.map { m => (m.name.get, Clock()) }):_* )))
+      val reset_io = IO(Input(AsyncReset())).suggestName("async_reset")
+
+      val input_clocks = IO(Input(new ClocksWithSinkParams(clockGroupEdge.sink.members)))
         .suggestName("clocks")
-      val reset = IO(Input(Reset())).suggestName("reset")
 
-      (clockGroupBundle.member.data zip input_clocks.data).foreach { case (clockBundle, inputClock) =>
+      (clockGroupBundle.member.data zip input_clocks.clocks).foreach { case (clockBundle, inputClock) =>
         clockBundle.clock := inputClock
-        clockBundle.reset := reset
+        clockBundle.reset := reset_io
       }
 
-      val pllConfig = new SimplePllConfiguration("firesimBuildTopClockGenerator", clockGroupEdge.sink.members)
-      pllConfig.emitSummaries
-      val rationalClockSpecs = for ((sinkP, division) <- pllConfig.sinkDividerMap) yield {
-        RationalClock(sinkP.name.get, 1, division)
-      }
+      (Seq(reset_io, input_clocks), Nil)
+    }
+  }
+})
 
-      chiptop.harnessFunctions += ((th: HasHarnessSignalReferences) => {
-        reset := th.buildtopReset
-        input_clocks := p(ClockBridgeInstantiatorKey)
-          .requestClockRecordMap(BuildTopClockParameters(
+class WithFireSimHarnessClockBinder extends OverrideHarnessBinder({
+  (system: HasChipyardPRCI, th: FireSim, ports: Seq[Data]) => {
+    implicit val p = th.p
+    ports.map ({
+      case c: ClocksWithSinkParams => {
+        val pllConfig = new SimplePllConfiguration("firesimBuildTopClockGenerator", c.params)
+        pllConfig.emitSummaries
+        th.setRefClockFreq(pllConfig.referenceFreqMHz)
+        val rationalClockSpecs = for ((sinkP, division) <- pllConfig.sinkDividerMap) yield {
+          RationalClock(sinkP.name.get, 1, division)
+        }
+        val input_clocks: RecordMap[Clock] = p(ClockBridgeInstantiatorKey).requestClockRecordMap(
+          BuildTopClockParameters(
             rationalClockSpecs.toSeq,
             p(FireSimBaseClockNameKey),
             pllConfig.referenceFreqMHz * (1000 * 1000)))
-        Nil })
-
-      // return the reference frequency
-      pllConfig.referenceFreqMHz
-    }
+        (c.clocks zip c.params) map ({ case (clock, param) =>
+          clock := input_clocks(param.name.get).get
+        })
+        println(input_clocks)
+        println(input_clocks.elements.keys)
+      }
+      case r: Reset => r := th.buildtopReset.asAsyncReset
+    })
   }
 })
 
@@ -230,8 +242,6 @@ class FireSim(implicit val p: Parameters) extends RawModule with HasHarnessSigna
   val peekPokeBridge = PeekPokeBridge(buildtopClock, buildtopReset)
   def dutReset = { require(false, "dutReset should not be used in Firesim"); false.B }
   def success = { require(false, "success should not be used in Firesim"); false.B }
-
-  var btFreqMHz: Option[Double] = None
 
   // Instantiate multiple instances of the DUT to implement supernode
   for (i <- 0 until p(NumNodes)) {
@@ -245,22 +255,13 @@ class FireSim(implicit val p: Parameters) extends RawModule with HasHarnessSigna
     })))
     val module = Module(lazyModule.module)
 
-    btFreqMHz = Some(lazyModule match {
-      case d: HasReferenceClockFreq => d.refClockFreqMHz
-      case _ => p(DefaultClockFrequencyKey)
-    })
-
-    lazyModule match { case d: HasTestHarnessFunctions =>
-      require(d.harnessFunctions.size == 1, "There should only be 1 harness function to connect clock+reset")
-      d.harnessFunctions.foreach(_(this))
-    }
     lazyModule match { case d: HasIOBinders =>
       ApplyHarnessBinders(this, d.lazySystem, d.portMap)
     }
     NodeIdx.increment()
   }
 
-  buildtopClock := p(ClockBridgeInstantiatorKey).requestClock("buildtop_reference_clock", btFreqMHz.get * (1000 * 1000))
+  buildtopClock := p(ClockBridgeInstantiatorKey).requestClock("buildtop_reference_clock", getRefClockFreq * (1000 * 1000))
 
   p(ClockBridgeInstantiatorKey).instantiateFireSimClockBridge
 }
