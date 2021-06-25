@@ -46,6 +46,14 @@ class WithGPIO extends Config((site, here, up) => {
 })
 // DOC include end: gpio config fragment
 
+class WithGPIOWidth(x: Int) extends Config((site, here, up) => {
+  case PeripheryGPIOKey => up(PeripheryGPIOKey, site) map { key => key.copy(width=x)}
+})
+
+class WithGPIOIncludeIOF(iof: Boolean = true) extends Config((site, here, up) => {
+  case PeripheryGPIOKey => up(PeripheryGPIOKey, site) map { key => key.copy(includeIOF = iof)}
+})
+
 class WithUART(baudrate: BigInt = 115200) extends Config((site, here, up) => {
   case PeripheryUARTKey => Seq(
     UARTParams(address = 0x54000000L, nTxEntries = 256, nRxEntries = 256, initBaudRate = baudrate))

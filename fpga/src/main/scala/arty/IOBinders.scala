@@ -7,6 +7,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.devices.debug._
 
 import sifive.blocks.devices.spi._
+import sifive.blocks.devices.gpio._
 
 import barstools.iocell.chisel._
 
