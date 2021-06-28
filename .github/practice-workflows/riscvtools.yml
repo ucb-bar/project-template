@@ -1,0 +1,23 @@
+name: chipyard-ci-process
+
+on: [push]
+
+env:
+  tools-cache-version: v6
+
+jobs:
+  install-riscv-toolchain:
+    name: install-riscv-toolchain
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Init submodules
+        run: ./scripts/init-submodules-no-riscv-tools.sh
+      - name: build riscv tools
+        run: ./scripts/build-toolchains.sh riscv-tools

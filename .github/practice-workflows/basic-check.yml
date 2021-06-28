@@ -1,0 +1,86 @@
+name: chipyard-ci-process
+
+on: [push]
+
+env:
+  tools-cache-version: v6
+
+jobs:
+  commit-on-master-check:
+    name: commit-on-master-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check commits of each submodle
+        run: .github/scripts/check-commit.sh
+
+  tutorial-setup-check:
+    name: tutorial-setup-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check that the tutorial-setup patches apply
+        run: scripts/tutorial-setup.sh
+
+  documentation-check:
+    name: documentation-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check that documentation builds with no warnings/errors
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pip
+          sudo pip3 install -r docs/requirements.txt
+          make -C docs html
+      - name: Show error log from sphinx if failed
+        if: ${{ failure() }}
+        run: cat /tmp/sphinx-err*.log
+
+
+  make-keys:
+    name: make keys
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Generate Hashes
+        run: .github/scripts/create-hash.sh
+      - name: generate key
+        id: genkey
+        run: |
+          echo "::set-output name=riscvtools-cache-key::riscv-tools-installed-${{ env.tools-cache-version }}-$(shasum riscv-tools.hash | cut -d' ' -f1)"
+          echo "::set-output name=esptools-cache-key::esp-tools-installed-${{ env.tools-cache-version }}-$(shasum riscv-tools.hash | cut -d' ' -f1)"
+          echo "::set-output name=extra-tests-cache-key::extra-tests-${{ github.ref }}-${{ github.sha }}"
+      - name: show key
+        run: |
+          echo "riscvtools key is " ${{ steps.genkey.outputs.riscvtools-cache-key }}
+          echo "esptools key is " ${{ steps.genkey.outputs.esptools-cache-key }}
+          echo "extra-tests key is " ${{ steps.genkey.outputs.extra-tests-cache-key }}
+    outputs:
+      riscvtools-cache-key: ${{ steps.genkey.outputs.riscvtools-cache-key }}
+      esptools-cache-key: ${{ steps.genkey.outputs.esptools-cache-key }}
+      extra-tests-cache-key: ${{ steps.genkey.outputs.extra-tests-cache-key }}

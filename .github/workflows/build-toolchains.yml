@@ -1,0 +1,215 @@
+name: chipyard-ci-process
+
+on: [push]
+
+env:
+  tools-cache-version: v6
+
+jobs:
+  commit-on-master-check:
+    name: commit-on-master-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check commits of each submodle
+        run: .github/scripts/check-commit.sh
+
+  tutorial-setup-check:
+    name: tutorial-setup-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check that the tutorial-setup patches apply
+        run: scripts/tutorial-setup.sh
+
+  documentation-check:
+    name: documentation-check
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check that documentation builds with no warnings/errors
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pip
+          sudo pip3 install -r docs/requirements.txt
+          make -C docs html
+      - name: Show error log from sphinx if failed
+        if: ${{ failure() }}
+        run: cat /tmp/sphinx-err*.log
+
+
+  make-keys:
+    name: make keys
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Generate Hashes
+        run: .github/scripts/create-hash.sh
+      - name: generate key
+        id: genkey
+        run: |
+          echo "::set-output name=riscvtools-cache-key::riscv-tools-installed-${{ env.tools-cache-version }}-$(shasum riscv-tools.hash | cut -d' ' -f1)"
+          echo "::set-output name=esptools-cache-key::esp-tools-installed-${{ env.tools-cache-version }}-$(shasum riscv-tools.hash | cut -d' ' -f1)"
+          echo "::set-output name=extra-tests-cache-key::extra-tests-${{ github.ref }}-${{ github.sha }}"
+      - name: show key
+        run: |
+          echo "riscvtools key is " ${{ steps.genkey.outputs.riscvtools-cache-key }}
+          echo "esptools key is " ${{ steps.genkey.outputs.esptools-cache-key }}
+          echo "extra-tests key is " ${{ steps.genkey.outputs.extra-tests-cache-key }}
+    outputs:
+      riscvtools-cache-key: ${{ steps.genkey.outputs.riscvtools-cache-key }}
+      esptools-cache-key: ${{ steps.genkey.outputs.esptools-cache-key }}
+      extra-tests-cache-key: ${{ steps.genkey.outputs.extra-tests-cache-key }}
+
+  install-riscv-toolchain:
+    needs: make-keys
+    name: install-riscv-toolchain
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        id: riscv-tools-cache
+        with:
+          path: riscv-tools-install
+          key: ${{ needs.make-keys.outputs.riscvtools-cache-key }}
+          restore-keys: ${{ needs.make-keys.outputs.riscvtools-cache-key }}
+      - name: build riscv tools if not cached
+        if: steps.riscv-tools-cache.outputs.cache-hit != 'true'
+        run: ./.github/scripts/build-toolchains.sh riscv-tools
+      - name: What is the filesystem picture
+        if: ${{ failure() }}
+        run: df -m
+      - name: show riscv-tools-install
+        run: ls -ltr riscv-tools-install
+
+  install-esp-toolchain:
+    needs: make-keys
+    name: install-esp-toolchain
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        id: esp-tools-cache
+        with:
+          path: esp-tools-install
+          key: ${{ needs.make-keys.outputs.esptools-cache-key }}
+          restore-keys: ${{ needs.make-keys.outputs.esptools-cache-key }}
+      - name: build esp tools if not cached
+        if: steps.esp-tools-cache.outputs.cache-hit != 'true'
+        run: ./.github/scripts/build-toolchains.sh esp-tools
+      - name: What is the filesystem picture
+        if: ${{ failure() }}
+        run: df -m
+      - name: show esp-tools-install
+        run: ls -ltr esp-tools-install
+
+  build-extra-tests:
+    name: build extra tests
+    needs: [make-keys, install-riscv-toolchain]
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        id: riscv-tools-cache
+        with:
+          path: riscv-tools-install
+          key: ${{ needs.make-keys.outputs.riscvtools-cache-key }}
+          restore-keys: ${{ needs.make-keys.outputs.riscvtools-cache-key }}
+      - name: quit if riscvtools cache not found
+        if: steps.riscv-tools-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "riscv-toolchain not installed"
+          exit 1
+
+      - uses: actions/cache@v2
+        id: build-extra-tools-cache
+        with:
+          path: extra-tests-install
+          key: ${{ needs.make-keys.outputs.extra-tests-cache-key }}
+          restore-keys: ${{ needs.make-keys.outputs.extra-tests-cache-key }}
+      - name: Build extra tests if not cached
+        if: steps.build-extra-tools-cache.outputs.cache-hit != 'true'
+        run: .github/scripts/build-extra-tests.sh
+      - name: show extra-tests-install
+        run: ls -ltr extra-tests-install
+
+  install-verilator:
+    name: install verilator
+    runs-on: ubuntu-latest
+    container:
+      image: ucbbar/chipyard-ci-image:1d51bb90
+      options: --entrypoint /bin/bash
+    env:
+      BUILDSERVER: ${{ secrets.BUILDSERVER }}
+      BUILDUSER: ${{ secrets.BUILDUSER }}
+      SERVER: ${{ secrets.BUILDUSER }}@${{ secrets.BUILDSERVER }}
+      JVM_OPTS: -Xmx3200m # Customize the JVM maximum heap limit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: show remote
+        run: echo remote server is ${{ secrets.BERKELEYSERVER }}
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SERVERKEY }}
+          known_hosts: ${{ secrets.BUILDSERVER }}
+
+      - name: build verilator on remote
+        run: .github/scripts/install-verilator.sh
+
+
+  # Sentinel job to simplify how we specify which that basic setup is complete
+  #
+  # When adding new jobs, please add them to `needs` below
+  setup-complete:
+    name: "setup complete"
+    needs: [commit-on-master-check, tutorial-setup-check, documentation-check,
+            install-riscv-toolchain, install-esp-toolchain, install-verilator,
+            build-extra-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: Set up complete!
+

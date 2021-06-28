@@ -18,7 +18,7 @@ clean () {
 }
 
 # make parallelism
-CI_MAKE_NPROC=8
+CI_MAKE_NPROC=4
 # chosen based on a 24c system shared with 1 other project
 REMOTE_MAKE_NPROC=4
 
@@ -26,8 +26,14 @@ REMOTE_MAKE_NPROC=4
 VERILATOR_VERSION=v4.034
 
 # remote variables
-REMOTE_PREFIX=$CI_DIR/$CIRCLE_PROJECT_REPONAME-$CIRCLE_BRANCH
-REMOTE_WORK_DIR=$REMOTE_PREFIX-$CIRCLE_SHA1-$CIRCLE_JOB
+#TODO: (chick) figure out what the following two lines should really be
+
+CURRENT_BRANCH=$(git branch --show-current)
+CI_DIR=/scratch/circleci # on ferry machine
+
+HOME=`pwd`
+REMOTE_PREFIX=$CI_DIR/$GITHUB_REPOSITORY-$CURRENT_BRANCH
+REMOTE_WORK_DIR=$REMOTE_PREFIX-$GITHUB_SHA-$GITHUB_RUN_ID
 REMOTE_RISCV_DIR=$REMOTE_WORK_DIR/riscv-tools-install
 REMOTE_ESP_DIR=$REMOTE_WORK_DIR/esp-tools-install
 REMOTE_CHIPYARD_DIR=$REMOTE_WORK_DIR/chipyard
@@ -43,7 +49,7 @@ REMOTE_VERILATOR_DIR=$REMOTE_PREFIX-$CIRCLE_SHA1-verilator-install
 LOCAL_CHECKOUT_DIR=$HOME/project
 LOCAL_RISCV_DIR=$HOME/riscv-tools-install
 LOCAL_ESP_DIR=$HOME/esp-tools-install
-LOCAL_CHIPYARD_DIR=$LOCAL_CHECKOUT_DIR
+LOCAL_CHIPYARD_DIR=$HOME
 LOCAL_SIM_DIR=$LOCAL_CHIPYARD_DIR/sims/verilator
 LOCAL_FIRESIM_DIR=$LOCAL_CHIPYARD_DIR/sims/firesim/sim
 
