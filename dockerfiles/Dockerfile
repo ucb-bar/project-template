@@ -15,7 +15,9 @@ RUN apt-get update && \
                sudo \
                ca-certificates \
                keyboard-configuration \
-               console-setup
+               console-setup \
+               bc \
+               unzip
 
 WORKDIR /root
 
@@ -50,6 +52,17 @@ RUN cd chipyard && \
 RUN cd chipyard && \
         export MAKEFLAGS=-"j $(nproc)" && \
         ./scripts/build-toolchains.sh esp-tools 1>/dev/null
+
+
+# Set up FireMarshal
+SHELL ["/bin/bash", "-c"] 
+RUN cd chipyard && \
+        source env.sh && \
+        cd software/firemarshal && \
+        ./init-submodules.sh && \
+        pip3 install -r python-requirements.txt && \
+        marshal build br-base.json 
+        
 
 # Run script to set environment variables on entry
 ENTRYPOINT ["chipyard/scripts/entrypoint.sh"]

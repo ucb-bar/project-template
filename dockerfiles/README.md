@@ -13,7 +13,8 @@ Build and Deploy the Container
     sudo docker tag <IMAGE_ID> <PATH_NAME>:tag . # to tag the image after the build (ex. 0.0.3)
     sudo docker login # login into the account to push to
     sudo docker push <PATH_NAME>:tag # to push to repo with tag
-    sudo docker run -it <IMAGE_ID> bash # to run an interactive version of the container
+    sudo docker run -it --privileged <IMAGE_ID> bash # to run an interactive version of the container
+
 
 Path Names
 ----------
