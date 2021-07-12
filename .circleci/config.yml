@@ -6,7 +6,7 @@ version: 2.1
 parameters:
     tools-cache-version:
         type: string
-        default: "v11"
+        default: "v12"
 
 # default execution env.s
 executors:
